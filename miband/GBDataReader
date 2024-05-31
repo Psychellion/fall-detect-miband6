@@ -1,0 +1,65 @@
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+
+public class GadgetbridgeDataReader {
+
+    // Directory where the data are stored
+    private static final String IN_DIR = "D:\\GLYCELLE\\Database";
+    private static final String DB_NAME = "Gadgetbridge";
+
+    public static void main(String[] args) {
+        String dbPath = IN_DIR + DB_NAME;
+
+        try {
+            Connection con = connectToDatabase(dbPath);
+            if (con != null) {
+                readGadgetbridgeData(con);
+                con.close();
+            }
+        } catch (SQLException e) {
+            System.err.println("SQL Exception: " + e.getMessage());
+        }
+    }
+
+    private static Connection connectToDatabase(String dbPath) {
+        Connection con = null;
+        try {
+            // Load the SQLite JDBC driver (you must have the .jar in your classpath)
+            Class.forName("org.sqlite.JDBC");
+            // Establish a connection to the database
+            con = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+            System.out.println("Connection to SQLite has been established.");
+        } catch (ClassNotFoundException | SQLException e) {System.err.println("Connection failed: " + e.getMessage());
+        }
+        return con;
+    }
+
+    private static void readGadgetbridgeData(Connection con) {
+        String query = "SELECT * FROM MI_BAND_ACTIVITY_SAMPLE WHERE HEART_RATE != -1 AND RAW_INTENSITY != -1";
+
+        try (Statement stmt = con.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                // Read data from the result set
+                long timestamp = rs.getLong("TIMESTAMP");
+                int heartRate = rs.getInt("HEART_RATE");
+                int rawIntensity = rs.getInt("RAW_INTENSITY");
+
+                // Convert UNIX timestamp to LocalDateTime
+                LocalDateTime dateTime = LocalDateTime.ofInstant(Instant.ofEpochSecond(timestamp), ZoneId.of("Europe/Paris"));
+                int hour = dateTime.getHour();
+                String date = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+                // Print or process the data
+                System.out.println("Timestamp: " + dateTime + ", Heart Rate: " + heartRate + ", Raw Intensity: " + rawIntensity + ", Hour: " + hour + ", Date: " + date);
+            }
+        } catch (SQLException e) {
+            System.err.println("Query failed: " + e.getMessage());
+        }
+    }
